@@ -17,6 +17,9 @@ Analyze the following file from the repository "${repo}" at path "${path}".
 Code:
 ${content}
 
+Your goal is to provide a concise, structured explanation of everything above.
+CRITICAL FORMATTING REQUIREMENT: Always insert TWO blank lines (\n\n) immediately before starting any bulleted/numbered lists (like * or -) so they format and render correctly natively in ReactMarkdown.
+
 Return a single JSON object with the following fields:
 1. "beginner": An ELI5 (Explain Like I'm 5) explanation of what this file does, keeping technical jargon to a minimum. Use simple analogies. Make it friendly and formated in markdown.
 2. "developer": A deeply technical explanation focusing on architecture, design patterns, and how it might fit into the broader system. Format in markdown.

@@ -22,20 +22,21 @@ export async function POST(request: Request) {
       parts: [{ text: msg.text }]
     }));
 
-    // Start a chat session
-    const chat = ai.chats.create({
+    // Start a chat session using stable generateContent
+    const contents = [
+      ...formattedHistory,
+      { role: 'user', parts: [{ text: message }] }
+    ];
+
+    const response = await ai.models.generateContent({
       model: "gemini-2.5-flash",
-      history: formattedHistory,
+      contents: contents,
       config: {
         systemInstruction: `You are an expert developer assistant specialized in understanding code. 
 The user is currently exploring the repository "${repo}".
 ${path ? `They are currently viewing the file at path: "${path}". Keep your answers relevant to this file's context if applicable.` : ''}
 Be concise, accurate, and helpful. Format any code snippets in markdown.`,
       }
-    });
-
-    const response = await chat.sendMessage({
-       message: message
     });
 
     return NextResponse.json({ response: response.text });

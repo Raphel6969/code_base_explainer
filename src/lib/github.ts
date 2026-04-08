@@ -14,6 +14,21 @@ export interface GitTreeResponse {
   truncated: boolean;
 }
 
+export async function fetchDefaultBranch(owner: string, repo: string): Promise<string> {
+  const token = process.env.GITHUB_TOKEN;
+  const headers: Record<string, string> = {
+    Accept: "application/vnd.github.v3+json",
+  };
+  if (token) headers.Authorization = `Bearer ${token}`;
+
+  const res = await fetch(`https://api.github.com/repos/${owner}/${repo}`, { headers });
+  if (!res.ok) {
+    throw new Error(`GitHub API error fetching repo detail: ${res.status} ${res.statusText}`);
+  }
+  const data = await res.json();
+  return data.default_branch || "main";
+}
+
 export async function fetchRepoTree(owner: string, repo: string, branch: string = "main"): Promise<GitTreeResponse> {
   const token = process.env.GITHUB_TOKEN;
   const headers: Record<string, string> = {
@@ -26,8 +41,15 @@ export async function fetchRepoTree(owner: string, repo: string, branch: string 
 
   if (!res.ok) {
     if (res.status === 404 && branch === "main") {
-      // Fallback to master if main doesn't exist
-      return fetchRepoTree(owner, repo, "master");
+      try {
+        const actualBranch = await fetchDefaultBranch(owner, repo);
+        if (actualBranch !== "main") {
+          return fetchRepoTree(owner, repo, actualBranch);
+        }
+      } catch (e) {
+        // Fallback to master if default_branch fetch fails 
+        return fetchRepoTree(owner, repo, "master");
+      }
     }
     throw new Error(`GitHub API error: ${res.status} ${res.statusText}`);
   }
@@ -47,8 +69,15 @@ export async function fetchFileContent(owner: string, repo: string, path: string
   
   if (!res.ok) {
     if (res.status === 404 && branch === "main") {
-      // Fallback to master if main doesn't exist
-      return fetchFileContent(owner, repo, path, "master");
+      try {
+        const actualBranch = await fetchDefaultBranch(owner, repo);
+        if (actualBranch !== "main") {
+          return fetchFileContent(owner, repo, path, actualBranch);
+        }
+      } catch(e) {
+         // Fallback to master if default_branch fetch fails 
+         return fetchFileContent(owner, repo, path, "master");
+      }
     }
     throw new Error(`Failed to fetch file content: ${res.status} ${res.statusText}`);
   }

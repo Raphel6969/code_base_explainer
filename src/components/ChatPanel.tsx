@@ -2,6 +2,7 @@
 import React, { useState } from "react";
 import { MessageSquare, Send, Bot, User } from "lucide-react";
 import { cn } from "@/lib/utils";
+import ReactMarkdown from "react-markdown";
 
 export function ChatPanel({ repo, path }: { repo: string, path: string | null }) {
   const [messages, setMessages] = useState<{role: "user" | "ai", text: string}[]>([]);
@@ -24,9 +25,13 @@ export function ChatPanel({ repo, path }: { repo: string, path: string | null })
         body: JSON.stringify({ repo, path, message: userMsg, history: messages })
       });
       const data = await res.json();
+      if (!res.ok || data.error) throw new Error(data.error || "API Error");
       setMessages(prev => [...prev, { role: "ai", text: data.response }]);
-    } catch (e) {
-      setMessages(prev => [...prev, { role: "ai", text: "Error connecting to AI." }]);
+    } catch (e: any) {
+      const errorMessage = e && e.message?.includes("temporarily") 
+        ? "⚠️ **Google AI Server Overloaded**\n\nThe Gemini model is currently experiencing a high traffic spike and rejected our chat request. Please wait a few seconds and try sending your message again."
+        : "⚠️ **Google AI Server Overloaded**\n\nThe Gemini model rejected the request due to high traffic volume. Spikes in demand are usually temporary. Please try again later.";
+      setMessages(prev => [...prev, { role: "ai", text: errorMessage }]);
     } finally {
       setLoading(false);
     }
@@ -50,18 +55,24 @@ export function ChatPanel({ repo, path }: { repo: string, path: string | null })
         ) : (
           messages.map((msg, i) => (
             <div key={i} className={cn("flex gap-3", msg.role === "user" ? "flex-row-reverse" : "flex-row")}>
-              <div className={cn("w-6 h-6 shrink-0 rounded-md flex items-center justify-center", msg.role === "user" ? "bg-blue-600 text-white" : "bg-violet-600 text-white")}>
+              <div className={cn("w-6 h-6 shrink-0 mt-1 rounded-md flex items-center justify-center", msg.role === "user" ? "bg-blue-600 text-white" : (msg.text || "").includes("⚠️") ? "bg-rose-600 text-white" : "bg-violet-600 text-white")}>
                 {msg.role === "user" ? <User className="w-3.5 h-3.5" /> : <Bot className="w-3.5 h-3.5" />}
               </div>
-              <div className={cn("px-3 py-2 rounded-xl text-sm max-w-[85%]", msg.role === "user" ? "bg-blue-600/20 text-blue-50 rounded-tr-none" : "bg-[var(--panel-border)] text-zinc-300 rounded-tl-none")}>
-                {msg.text}
+              <div className={cn("px-4 py-2.5 rounded-xl text-sm max-w-[90%] overflow-x-auto min-w-0 transition-colors break-words", msg.role === "user" ? "bg-blue-600/20 text-blue-50 rounded-tr-none" : (msg.text || "").includes("⚠️") ? "bg-rose-500/10 border border-rose-500/20 text-rose-300 rounded-tl-none" : "bg-[var(--panel-border)] text-zinc-300 rounded-tl-none")}>
+                {msg.role === "ai" ? (
+                   <div className="prose prose-invert prose-sm min-w-0 w-full max-w-none prose-p:leading-relaxed prose-pre:bg-[#0d1117] prose-pre:border prose-pre:border-[var(--panel-border)] prose-pre:overflow-x-auto prose-pre:max-w-full prose-pre:whitespace-pre prose-code:break-normal prose-p:last:mb-0 prose-p:first:mt-0">
+                     <ReactMarkdown>{msg.text || "*No response returned by AI.*"}</ReactMarkdown>
+                   </div>
+                ) : (
+                   msg.text || ""
+                )}
               </div>
             </div>
           ))
         )}
         {loading && (
           <div className="flex gap-3">
-             <div className="w-6 h-6 shrink-0 rounded-md flex items-center justify-center bg-violet-600 text-white">
+             <div className="w-6 h-6 shrink-0 mt-1 rounded-md flex items-center justify-center bg-violet-600 text-white">
                 <Bot className="w-3.5 h-3.5" />
              </div>
              <div className="px-3 py-2 rounded-xl text-sm bg-[var(--panel-border)] text-zinc-400 rounded-tl-none flex items-center gap-1">
@@ -74,8 +85,10 @@ export function ChatPanel({ repo, path }: { repo: string, path: string | null })
       </div>
 
       <div className="p-3 border-t border-[var(--panel-border)] shrink-0">
+         {/* Using an arbitrary spacer div isn't needed here but standard DOM elements are strictly maintained */}
         <form onSubmit={handleSend} className="relative">
           <input
+            suppressHydrationWarning
             value={input}
             onChange={(e) => setInput(e.target.value)}
             disabled={!path || loading}
@@ -84,6 +97,7 @@ export function ChatPanel({ repo, path }: { repo: string, path: string | null })
           />
           <button 
             type="submit" 
+            suppressHydrationWarning
             disabled={!path || !input.trim() || loading}
             className="absolute right-2 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-accent disabled:opacity-50 transition-colors"
           >
